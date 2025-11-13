@@ -1,0 +1,50 @@
+name: Deploy Docker Compose on EC2
+
+on:
+  workflow_dispatch:
+   inputs:
+      branch:
+        description: 'Git branch to deploy'
+        required: false
+        default: 'master'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Start SSH agent
+      uses: webfactory/ssh-agent@v0.7.1
+      with:
+        ssh-private-key: ${{ secrets.EC2_KEY }}
+
+    - name: Connect to EC2 and deploy
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          
+          # Update repo or clone if not exists
+          if [ -d ~/app ]; then
+            cd ~/app
+            git fetch origin
+            git reset --hard origin/${{ secrets.GIT_BRANCH || 'master' }}
+          else
+            git clone -b ${{ secrets.GIT_BRANCH || 'master' }} https://github.com/aries89/microservices-deployment.git ~/app
+            cd ~/app
+          fi
+
+          # Configure AWS CLI for ECR
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
+
+          # Login to ECR
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin <your-aws-account-id>.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+          # Deploy with Docker Compose
+          docker-compose down
+          docker-compose pull
+          docker-compose up -d --build
+        EOF
