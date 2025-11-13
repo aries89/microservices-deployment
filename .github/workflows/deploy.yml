@@ -30,6 +30,7 @@ jobs:
             echo "Creating .env.aws from GitHub Secrets..."
             echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" > ~/microservices-deployment/.env.aws
             echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> ~/microservices-deployment/.env.aws
+            echo "POSTGRES_HOST=postgres" >> ~/microservices-deployment/.env.aws
             echo "USER_SERVICE_IMAGE=${{ secrets.USER_SERVICE_IMAGE }}" >> ~/microservices-deployment/.env.aws
             echo "PRODUCT_SERVICE_IMAGE=${{ secrets.PRODUCT_SERVICE_IMAGE }}" >> ~/microservices-deployment/.env.aws
             echo "ORDER_SERVICE_IMAGE=${{ secrets.ORDER_SERVICE_IMAGE }}" >> ~/microservices-deployment/.env.aws
