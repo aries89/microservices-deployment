@@ -1,14 +1,12 @@
-name: Deploy to EC2 using RDS
+name: Deploy RDS Stack to EC2
 
 on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Git branch to deploy'
-        required: false
-        default: 'master'
-  push:
-    branches: [ master ]
+        description: "Branch to deploy"
+        required: true
+        default: "master"
 
 jobs:
   deploy:
@@ -18,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (for GitHub runner)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -32,19 +30,24 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            echo "Starting deployment to EC2..."
+
             BRANCH="${{ github.event.inputs.branch }}"
 
-            # Clone or update repo
+            # Clone or update the repo
             if [ -d ~/microservices-deployment ]; then
+              echo "Updating existing repo..."
               cd ~/microservices-deployment
               git fetch origin
               git reset --hard origin/$BRANCH
             else
+              echo "Cloning repo..."
               git clone -b $BRANCH https://github.com/aries89/microservices-deployment.git ~/microservices-deployment
               cd ~/microservices-deployment
             fi
 
-            # Create .env.aws dynamically from GitHub Secrets
+            # Create .env.aws from GitHub Secrets
+            echo "Creating .env.aws..."
             echo "MASTER_USER=${{ secrets.MASTER_USER }}" > .env.aws
             echo "MASTER_PASSWORD=${{ secrets.MASTER_PASSWORD }}" >> .env.aws
             echo "USER_SERVICE_IMAGE=${{ secrets.USER_SERVICE_IMAGE }}" >> .env.aws
@@ -52,12 +55,27 @@ jobs:
             echo "ORDER_SERVICE_IMAGE=${{ secrets.ORDER_SERVICE_IMAGE }}" >> .env.aws
             echo "RDS_ENDPOINT=${{ secrets.RDS_ENDPOINT }}" >> .env.aws
 
-            # Login to AWS ECR
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            # Configure AWS credentials on EC2
+            echo "Configuring AWS CLI credentials..."
+            mkdir -p ~/.aws
+            echo "[default]" > ~/.aws/credentials
+            echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+            echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+            echo "[default]" > ~/.aws/config
+            echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
 
-            # Pull and deploy containers using the specific compose file
+            # Verify AWS credentials (optional debug)
+            aws sts get-caller-identity || exit 1
+
+            # Login to ECR
+            echo "🔑 Logging into AWS ECR..."
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+              | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            # Pull and run containers
+            echo "Pulling and starting containers..."
             docker-compose --env-file .env.aws -f docker-compose.rds.yml down
             docker-compose --env-file .env.aws -f docker-compose.rds.yml pull
             docker-compose --env-file .env.aws -f docker-compose.rds.yml up -d --build
 
-            echo "Deployment complete!"
+            echo "✅ Deployment complete!"
