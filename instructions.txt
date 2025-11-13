@@ -1,0 +1,15 @@
+To deploy on EC2 in AWS (All services including databases on one vm as docker containers)
+ - Launch an instance (Ubuntu , large)
+ - Allow ports 22,8081-8083
+ - Use the .pem key that is added in github secrets
+ - SSH to the instance
+ - Update all packages
+ - Install docker
+ - Install docker compose
+ - Install aws cli
+ 
+To deploy on EC2 in AWS (Database moved to RDS and other services as docker containers)
+ - Lauch RDS (Either in same sec group as EC2 or new, if yes add inbound rule of 5432)
+ - Lauch EC2 (Either in same sec group as RDS or new, add inbound rules for ssh, 8081-8083)
+ - Prepare EC2 for deployment
+ - Create dbs in RDS

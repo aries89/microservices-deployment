@@ -1,0 +1,44 @@
+**** Update and install docker *****
+
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y docker.io
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo usermod -aG docker $USER  # allows running docker without sudo
+
+
+After usermod, log out and back in for changes to take effect.
+
+****Setup docker compose *****
+
+sudo apt install -y curl
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose --version  # verify
+
+*****  Install AWS CLI *****
+
+sudo apt install -y unzip curl
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version
+
+
+*****Optional if using RDS******
+
+sudo apt install -y postgresql-client
+
+The general syntax is:
+
+psql -h <RDS_ENDPOINT> -U <MASTER_USER> -d postgres -p 5432
+
+
+<RDS_ENDPOINT> → Your RDS instance endpoint (e.g., mydb.abcdefghijk.us-east-1.rds.amazonaws.com)
+
+<MASTER_USER> → RDS master username
+
+-d postgres → Connect to default postgres database first
+
+-p 5432 → PostgreSQL port
