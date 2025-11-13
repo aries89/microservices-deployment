@@ -2,7 +2,7 @@ name: Deploy Docker Compose on EC2
 
 on:
   workflow_dispatch:
-   inputs:
+    inputs:
       branch:
         description: 'Git branch to deploy'
         required: false
@@ -21,16 +21,26 @@ jobs:
     - name: Connect to EC2 and deploy
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          
-          # Update repo or clone if not exists
+
+          BRANCH="${{ github.event.inputs.branch }}"
+
+          # Clone or update repo
           if [ -d ~/app ]; then
             cd ~/app
             git fetch origin
-            git reset --hard origin/${{ secrets.GIT_BRANCH || 'master' }}
+            git reset --hard origin/$BRANCH
           else
-            git clone -b ${{ secrets.GIT_BRANCH || 'master' }} https://github.com/aries89/microservices-deployment.git ~/app
+            git clone -b $BRANCH https://github.com/aries89/microservices-deployment.git ~/app
             cd ~/app
           fi
+
+          # Create .env file dynamically from GitHub Secrets using echo
+          echo "USER_SERVICE_IMAGE=${{ secrets.USER_SERVICE_IMAGE }}" > .env
+          echo "PRODUCT_SERVICE_IMAGE=${{ secrets.PRODUCT_SERVICE_IMAGE }}" >> .env
+          echo "ORDER_SERVICE_IMAGE=${{ secrets.ORDER_SERVICE_IMAGE }}" >> .env
+          echo "RDS_ENDPOINT=${{ secrets.RDS_ENDPOINT }}" >> .env
+          echo "MASTER_USER=${{ secrets.MASTER_USER }}" >> .env
+          echo "MASTER_PASSWORD=${{ secrets.MASTER_PASSWORD }}" >> .env
 
           # Configure AWS CLI for ECR
           mkdir -p ~/.aws
@@ -41,10 +51,11 @@ jobs:
           echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
 
           # Login to ECR
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin <your-aws-account-id>.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
-          # Deploy with Docker Compose
-          docker-compose down
-          docker-compose pull
-          docker-compose up -d --build
+          # Deploy Docker Compose using the .env file
+          docker-compose --env-file ./.env -f ./docker-compose.rds.yml down
+          docker-compose --env-file ./.env -f ./docker-compose.rds.yml pull
+          docker-compose --env-file ./.env -f ./docker-compose.rds.yml up -d --build
+
         EOF
